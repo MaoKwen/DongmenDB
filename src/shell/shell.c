@@ -223,7 +223,15 @@ int dongmendb_shell_handle_create_table(dongmendb_shell_handle_sql_t *ctx, const
     memset(parser->parserMessage, 0, sizeof(parser->parserMessage));
 
     sql_stmt_create *sqlStmtCreate = parse_sql_stmt_create(parser);
-    int status = table_manager_create_table(ctx->db->metadataManager->tableManager,
+
+    /*TODO: 检查是否已经存在要创建的表 */
+    int status =  semantic_check_table_exists(ctx->db->metadataManager->tableManager, sqlStmtCreate->tableInfo->tableName, ctx->db->tx);
+    if (status){
+        fprintf(stderr, "table exists.");
+        return DONGMENDB_ERROR_IO;
+    }
+
+    status = table_manager_create_table(ctx->db->metadataManager->tableManager,
                                             sqlStmtCreate->tableInfo->tableName,
                                             sqlStmtCreate->tableInfo->fieldsName,
                                             sqlStmtCreate->tableInfo->fields,
@@ -252,7 +260,17 @@ int dongmendb_shell_handle_insert_table(dongmendb_shell_handle_sql_t *ctx, const
     memset(parser->parserMessage, 0, sizeof(parser->parserMessage));
 
     sql_stmt_insert *sqlStmtInsert = parse_sql_stmt_insert(parser);
-    int status = plan_execute_insert(ctx->db, sqlStmtInsert->tableName,
+
+    /* TODO: 语义检查:检查表和字段是否存在*/
+    int status =  semantic_check_table_exists(ctx->db->metadataManager->tableManager, sqlStmtInsert->tableName, ctx->db->tx);
+    if (!status){
+        fprintf(stderr, "table does not exist.");
+        return DONGMENDB_ERROR_IO;
+    }
+
+    /* TODO: 安全性检查 */
+
+    status = plan_execute_insert(ctx->db, sqlStmtInsert->tableName,
                                      sqlStmtInsert->fields,
                                      sqlStmtInsert->values,
                                      ctx->db->tx);
@@ -286,6 +304,14 @@ int dongmendb_shell_handle_select_table(dongmendb_shell_handle_sql_t *ctx, const
     } else {
         printf(parser->parserMessage);
     }
+
+    /*TODO: 语义检查：表与字段是否存在*/
+
+    /*TODO: 安全性检查：用户是否有权限访问select中的数据表*/
+
+    /*TODO: 逻辑优化：关系代数优化*/
+
+
     if (selectStmt != NULL) {
         /*执行select语句，获得物理扫描计划*/
         physical_scan *plan = plan_execute_select(ctx->db, selectStmt, ctx->db->tx);
@@ -334,12 +360,24 @@ int dongmendb_shell_handle_update_data(dongmendb_shell_handle_sql_t *ctx, const 
     /*TODO: parse_sql_stmt_update， update语句解析*/
     sql_stmt_update *sqlStmtUpdate = parse_sql_stmt_update(parser);
     if (sqlStmtUpdate != NULL) {
+        /* 显示update语句包含的查询计划*/
         sql_stmt_update_print(sqlStmtUpdate);
     } else {
         printf(parser->parserMessage);
     }
+
+    /*TODO: 语义检查：表与字段是否存在*/
+    int status = semantic_check_table_exists(ctx->db->metadataManager->tableManager, sqlStmtUpdate->tableName, ctx->db->tx);
+
+    if (!status){
+        fprintf(stdout, "table does not exist!");
+        return status;
+    }
+
+    /*TODO: 安全性检查：用户是否有权限访问select中的数据表*/
+
     /*TODO: plan_execute_update， update语句执行*/
-    int status = plan_execute_update(ctx->db, sqlStmtUpdate,
+    status = plan_execute_update(ctx->db, sqlStmtUpdate,
                                      ctx->db->tx);
 
     if (status == DONGMENDB_OK) {
@@ -357,8 +395,10 @@ int dongmendb_shell_handle_delete_data(dongmendb_shell_handle_sql_t *ctx, const 
     /**
      *  1 初始化 TokenizerT和ParserT
      *  2 解析update语句：parse_sql_stmt_delete，在src_experiment\exp_01_stmt_parser\exp_01_05_delete.c中实现
-     *  3 获得物理计划：plan_execute_delete
-     *  4 执行物理计划
+     *  3 语义检查
+     *  4 安全性检查
+     *  5 获得物理计划：plan_execute_delete
+     *  6 执行物理计划
      */
     fprintf(stderr, "TODO: delete is not implemented yet.\n ");
 }
