@@ -23,7 +23,6 @@ sql_stmt_update *parse_sql_stmt_update(ParserT *parser) {
     arraylist *fields = arraylist_create();
     arraylist *fieldsExpr = arraylist_create();
     SRA_t *where = NULL;
-    SRA_t *tableExpr = NULL;
 
     TokenT *token;
 
@@ -55,15 +54,10 @@ sql_stmt_update *parse_sql_stmt_update(ParserT *parser) {
     }
 
     // where
-    token = parseNextToken(parser);
-    TableReference_t *ref = TableReference_make(tableName, NULL);
-    where = tableExpr = SRATable(ref);
-    if (token != NULL && token->type != TOKEN_SEMICOLON) { // have a where expr
-        if (!matchToken(parser, TOKEN_RESERVED_WORD, "where")) {
-            return NULL;
-        }
+    where = SRATable(TableReference_make(tableName, NULL));
+    if (matchToken(parser, TOKEN_RESERVED_WORD, "where")) {
         Expression *cond = parseExpressionRD(parser);
-        where = SRASelect(tableExpr, cond);
+        where = SRASelect(where, cond);
     }
 
     // return
@@ -78,40 +72,36 @@ sql_stmt_update *parse_sql_stmt_update(ParserT *parser) {
 
 int parseAssignExpr(ParserT *parser, arraylist *fields, arraylist *fieldsExpr) {
     TokenT *token = parseNextToken(parser);
-
-    if (token == NULL || token->type != TOKEN_WORD) {
-        strcpy(parser->parserMessage, "invalid sql: missing <field1> = <expr1>[, <field2 = <expr2>, ..].");
-        return 0;
-    }
-
     while (1) {
         // field
-        if (token->type == TOKEN_WORD) {
-            char *fieldName = new_id_name();
-            strcpy(fieldName, token->text);
-            arraylist_add(fields, fieldName);
-            token = parseEatAndNextToken(parser);
-            // =
-            if (token->type == TOKEN_EQ) {
-                parseEatAndNextToken(parser);
-                // expr
-                Expression *expr = parseExpressionRD(parser);
-                arraylist_add(fieldsExpr, expr);
-            } else {
-                strcpy(parser->parserMessage, "invalid sql: missing '='.");
-                return 0;
-            }
-        } else {
+        if (token == NULL || token->type != TOKEN_WORD) {
             strcpy(parser->parserMessage, "invalid sql: missing field name.");
             return 0;
         }
 
+        char *fieldName = new_id_name();
+        strcpy(fieldName, token->text);
+        arraylist_add(fields, fieldName);
+        parseEatAndNextToken(parser);
+
+        // =
+        if (!matchToken(parser, TOKEN_EQ, "=")) {
+            return 0;
+        }
+
+        // expr
+        Expression *expr = parseExpressionRD(parser);
+        if (parser->parserStateType == PARSER_WRONG) {
+            strcpy(parser->parserMessage, "invalid sql: invalid expression.");
+            return 0;
+        }
+        arraylist_add(fieldsExpr, expr);
+
         token = parseNextToken(parser);
-        if (token != NULL && token->type == TOKEN_COMMA) {
-            token = parseEatAndNextToken(parser);
-        } else {
+        if (token == NULL || token->type != TOKEN_COMMA) {
             break;
         }
+        token = parseEatAndNextToken(parser);
     }
     return 1;
 };
