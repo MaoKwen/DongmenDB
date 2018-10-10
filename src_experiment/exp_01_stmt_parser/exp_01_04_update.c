@@ -33,7 +33,7 @@ sql_stmt_update *parse_sql_stmt_update(ParserT *parser) {
 
     // table_name
     token = parseNextToken(parser);
-    if (token->type == TOKEN_WORD) {
+    if (token && token->type == TOKEN_WORD) {
         tableName = new_id_name();
         strcpy(tableName, token->text);
     } else {
