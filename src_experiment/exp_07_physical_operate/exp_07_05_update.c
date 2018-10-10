@@ -29,7 +29,7 @@ int plan_execute_update(dongmendb *db, sql_stmt_update *sqlStmtUpdate , transact
 
             if (val->type != field_type) {
                 fprintf(stdout, "invalid sql: field type mismatched.");
-                return DONGMENDB_EINVALIDSQL;
+                return -1;
             }
 
             if (val->type == DATA_TYPE_INT) {
@@ -50,5 +50,5 @@ int plan_execute_update(dongmendb *db, sql_stmt_update *sqlStmtUpdate , transact
     scan->close(scan);
     fprintf(stdout, " updated %d lines.\n", updated_lines);
 
-    return DONGMENDB_OK;
+    return updated_lines;
 };
