@@ -142,10 +142,18 @@ int isReservedWord(char *word) {
 TokenT *makeToken(TokenizerT *tk, TokenType type) {
     TokenT *token = (TokenT *) malloc(sizeof(TokenT));
 
-    token->text = (char *) malloc(sizeof(char) * 1000);
-    strcpy(token->text, tk->tokenBuffer);
-
     token->type = type;
+    token->text = (char *) malloc(sizeof(char) * 1000);
+
+    /*如果是字符串，需要从token->text去掉单引号*/
+    if (type == TOKEN_STRING){
+        char *v = tk->tokenBuffer + 1;
+        int len = strlen(tk->tokenBuffer) - 1;
+        strcpy(token->text, v);
+        token->text[len-1] = '\0';
+    } else {
+        strcpy(token->text, tk->tokenBuffer);
+    }
 
     return token;
 }
@@ -256,7 +264,24 @@ TokenT *_mod(TokenizerT *tk) {
  * incomplete char literals end abruptly.
  * invalid char literals don't close properly or at all.
  */
+/* 使用单引号标注字符串*/
 TokenT *_single_quote(TokenizerT *tk) {
+    int atEndOfFile = nextChar(tk);
+    while (tk->inputIter[0] != '\'') {
+        if (tk->inputIter[0] == '\\') {
+            if (atEndOfFile) {
+                return makeToken(tk, TOKEN_UNENDED_SRING);
+            }
+            atEndOfFile = nextChar(tk);
+        }
+        if (atEndOfFile) {
+            return makeToken(tk, TOKEN_UNENDED_SRING);
+        }
+        atEndOfFile = nextChar(tk);
+    }
+    nextChar(tk);
+    return makeToken(tk, TOKEN_STRING);
+    /*
     int atEndOfFile = nextChar(tk);
     if (atEndOfFile) {
         return makeToken(tk, TOKEN_INCOMPLETE_CHAR);  // case: 'EOF
@@ -290,6 +315,7 @@ TokenT *_single_quote(TokenizerT *tk) {
             return makeToken(tk, TOKEN_INVALID_CHAR);  // case: '\cc
         }
     }
+     */
 }
 
 TokenT *_open_paren(TokenizerT *tk) {
