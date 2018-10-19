@@ -48,7 +48,6 @@ int plan_execute_update(dongmendb *db, sql_stmt_update *sqlStmtUpdate , transact
         updated_lines += 1;
     }
     scan->close(scan);
-    fprintf(stdout, " updated %d lines.\n", updated_lines);
 
     return updated_lines;
 };

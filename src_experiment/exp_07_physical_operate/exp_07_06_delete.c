@@ -23,7 +23,6 @@ int plan_execute_delete(dongmendb *db, sql_stmt_delete *sqlStmtDelete,  transact
         deleted_lines += 1;
     }
     scan->close(scan);
-    fprintf(stdout, " updated %d lines.\n", deleted_lines);
 
     return deleted_lines;
 };

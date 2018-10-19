@@ -412,7 +412,6 @@ int dongmendb_shell_handle_delete_data(dongmendb_shell_handle_sql_t *ctx, const 
     ParserT *parser = newParser(tokenizer);
     memset(parser->parserMessage, 0, sizeof(parser->parserMessage));
 
-    /*TODO: parse_sql_stmt_update， update语句解析*/
     sql_stmt_delete *sqlStmtDelete = parse_sql_stmt_delete(parser);
     if (sqlStmtDelete == NULL) {
         printf(parser->parserMessage);
@@ -429,7 +428,6 @@ int dongmendb_shell_handle_delete_data(dongmendb_shell_handle_sql_t *ctx, const 
 
     /*TODO: 安全性检查：用户是否有权限访问select中的数据表*/
 
-    /*TODO: plan_execute_update， update语句执行*/
     int count = plan_execute_delete(ctx->db, sqlStmtDelete,
                                     ctx->db->tx);
 
