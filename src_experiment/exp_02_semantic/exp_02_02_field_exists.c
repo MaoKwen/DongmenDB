@@ -20,5 +20,17 @@ int semantic_check_field_exists(table_manager *tableManager, char *tableName, ch
      * 2. 若 table_info 为NULL则不存在，否则存在.
      * 3  通过table_info查看fieldsName是否存在指定的fieldName
      * */
-    return DONGMENDB_OK;
+    table_info *tableInfo = table_manager_get_tableinfo(tableManager, tableName, tx);
+    if (tableInfo == NULL) {
+        return DONGMENDB_ERROR_IO;
+    }
+
+    arraylist *fieldsName = tableInfo->fieldsName;
+    for (size_t i = 0; i < fieldsName->size; ++i) {
+        if (!strcmp(arraylist_get(fieldsName, i), fieldName)) {
+            return DONGMENDB_OK;
+        }
+    }
+
+    return DONGMENDB_ERROR_IO;
 }
