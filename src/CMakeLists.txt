@@ -44,8 +44,17 @@ aux_source_directory(physicalplan DIR_SRCS_PHYSICALPLAN)
 ADD_LIBRARY(physicalplan ${DIR_SRCS_PHYSICALPLAN})
 
 aux_source_directory(dongmensql DIR_SRCS_DONGMENSQL)
+
+#增加代数优化的实验内容
+set(DIR_SRCS_DONGMENSQL ${DIR_SRCS_DONGMENSQL} ../src_experiment/exp_05_algebra_opt/exp_05_02_condition_push_down.c )
+
 ADD_LIBRARY(dongmensql ${DIR_SRCS_DONGMENSQL})
 
 aux_source_directory(shell DIR_SRCS_SHELL)
 ADD_LIBRARY(shell ${DIR_SRCS_SHELL})
-TARGET_LINK_LIBRARIES(shell dongmendb parser dongmensql utils physicalplan)
+
+aux_source_directory(test_base DIR_SRCS_TEST_BASE)
+ADD_LIBRARY(test_base ${DIR_SRCS_TEST_BASE})
+
+
+TARGET_LINK_LIBRARIES(shell dongmendb parser dongmensql utils physicalplan test_base)

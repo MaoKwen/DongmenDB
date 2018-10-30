@@ -10,11 +10,15 @@
 #include <utils/utils.h>
 #include <parser/statement.h>
 #include <physicalplan/physicalplan.h>
+#include <dongmensql/optimizer.h>
 
 /*
  * 解析sql语句获得描述语句的结构，然后执行语句
  *
  * */
+#ifdef __cplusplus
+extern "C" {
+#endif
 
 #define COL_SEPARATOR "|"
 
@@ -216,12 +220,12 @@ int dongmendb_shell_handle_create_table(dongmendb_shell_handle_sql_t *ctx, const
         fprintf(stderr, "ERROR: No database is open.\n");
         return 1;
     }
-    char *sql = (char *) calloc(strlen(sqlcreate), 1);
-    strcpy(sql, sqlcreate);
-    TokenizerT *tokenizer = TKCreate(sql);
+
+    TokenizerT *tokenizer = TKCreate(sqlcreate);
     ParserT *parser = newParser(tokenizer);
     memset(parser->parserMessage, 0, sizeof(parser->parserMessage));
 
+//    int status = 0;
     sql_stmt_create *sqlStmtCreate = parse_sql_stmt_create(parser);
 
     /*TODO: 检查是否已经存在要创建的表 */
@@ -231,7 +235,7 @@ int dongmendb_shell_handle_create_table(dongmendb_shell_handle_sql_t *ctx, const
         return DONGMENDB_ERROR_IO;
     }
 
-    status = table_manager_create_table(ctx->db->metadataManager->tableManager,
+   status = table_manager_create_table(ctx->db->metadataManager->tableManager,
                                             sqlStmtCreate->tableInfo->tableName,
                                             sqlStmtCreate->tableInfo->fieldsName,
                                             sqlStmtCreate->tableInfo->fields,
@@ -253,9 +257,8 @@ int dongmendb_shell_handle_insert_table(dongmendb_shell_handle_sql_t *ctx, const
         fprintf(stderr, "ERROR: No database is open.\n");
         return 1;
     }
-    char *sql = (char *) calloc(strlen(sqlinsert), 1);
-    strcpy(sql, sqlinsert);
-    TokenizerT *tokenizer = TKCreate(sql);
+
+    TokenizerT *tokenizer = TKCreate(sqlinsert);
     ParserT *parser = newParser(tokenizer);
     memset(parser->parserMessage, 0, sizeof(parser->parserMessage));
 
@@ -291,9 +294,8 @@ int dongmendb_shell_handle_select_table(dongmendb_shell_handle_sql_t *ctx, const
         fprintf(stderr, "ERROR: No database is open.\n");
         return 1;
     }
-    char *sql = (char *) calloc(strlen(sqlselect), 1);
-    strcpy(sql, sqlselect);
-    TokenizerT *tokenizer = TKCreate(sql);
+
+    TokenizerT *tokenizer = TKCreate(sqlselect);
     ParserT *parser = newParser(tokenizer);
     memset(parser->parserMessage, 0, sizeof(parser->parserMessage));
 
@@ -311,10 +313,15 @@ int dongmendb_shell_handle_select_table(dongmendb_shell_handle_sql_t *ctx, const
 
     /*TODO: 逻辑优化：关系代数优化*/
 
+    SRA_t *optmiziedSelectStmt = dongmengdb_algebra_optimize_condition_pushdown(selectStmt);
 
-    if (selectStmt != NULL) {
+    if (optmiziedSelectStmt == NULL) {
+        return DONGMENDB_EINVALIDSQL;
+    }
+
+    if (optmiziedSelectStmt != NULL) {
         /*执行select语句，获得物理扫描计划*/
-        physical_scan *plan = plan_execute_select(ctx->db, selectStmt, ctx->db->tx);
+        physical_scan *plan = plan_execute_select(ctx->db, optmiziedSelectStmt, ctx->db->tx);
         arraylist *exprs = plan->physicalScanProject->expr_list;
         printf("\n%s\n", getExpressionNamesTitle(exprs));
         plan->beforeFirst(plan);
@@ -349,10 +356,9 @@ int dongmendb_shell_handle_update_data(dongmendb_shell_handle_sql_t *ctx, const 
         fprintf(stderr, "ERROR: No database is open.\n");
         return 1;
     }
-    char *sql = (char *) calloc(strlen(sqlupdate), 1);
-    strcpy(sql, sqlupdate);
+
     /* token解析 */
-    TokenizerT *tokenizer = TKCreate(sql);
+    TokenizerT *tokenizer = TKCreate(sqlupdate);
     /* parser解析 */
     ParserT *parser = newParser(tokenizer);
     memset(parser->parserMessage, 0, sizeof(parser->parserMessage));
@@ -405,10 +411,12 @@ int dongmendb_shell_handle_delete_data(dongmendb_shell_handle_sql_t *ctx, const 
         fprintf(stderr, "ERROR: No database is open.\n");
         return 1;
     }
+
     char *sql = (char *) calloc(strlen(sqldelete), 1);
     strcpy(sql, sqldelete);
 
     TokenizerT *tokenizer = TKCreate(sql);
+
     ParserT *parser = newParser(tokenizer);
     memset(parser->parserMessage, 0, sizeof(parser->parserMessage));
 
@@ -491,42 +499,36 @@ int dongmendb_shell_handle_cmd_parse(dongmendb_shell_handle_sql_t *ctx, struct h
     return DONGMENDB_OK;
 }
 
-/* Implemented in optimizer.c */
-int dongmendb_stmt_optimize(dongmendb *db,
-                            dongmensql_statement_t *sqlStmt,
-                            dongmensql_statement_t **sqlStmtOpt);
-
 int dongmendb_shell_handle_cmd_opt(dongmendb_shell_handle_sql_t *ctx, struct handler_entry *e, const char **tokens,
                                    int ntokens) {
-    dongmensql_statement_t *sqlStmt, *sqlStmtOpt;
-    int rc;
 
-    if (ntokens != 2) {
-        usage_error(e, "Invalid arguments");
-        return 1;
+    char cmdstring[MAX_CMD];
+    /*先将tokens中的select语句重新组合为一个*/
+    for (int i = 1; i < ntokens; i++){
+        strcat(cmdstring, tokens[i]);
+        strcat(cmdstring, " ");
+    };
+
+    TokenizerT *tokenizer = TKCreate(cmdstring);
+    ParserT *parser = newParser(tokenizer);
+    memset(parser->parserMessage, 0, sizeof(parser->parserMessage));
+
+    /* 解析 select语句，获得SRA_t对象*/
+    SRA_t *selectStmt = parse_sql_stmt_select(parser);
+    if (selectStmt != NULL) {
+        printf("\n");
+        SRA_print(selectStmt);
+    } else {
+        printf(parser->parserMessage);
     }
 
-    if (!ctx->db) {
-        fprintf(stderr, "ERROR: No database is open.\n");
-        return 1;
-    }
+    SRA_t *optmiziedSelectStmt = dongmengdb_algebra_optimize_condition_pushdown(selectStmt);
 
-    rc = dongmensql_parser(tokens[1], &sqlStmt);
-
-    if (rc != DONGMENDB_OK) {
-        return rc;
-    }
-
-    dongmensql_stmt_print(sqlStmt);
-    printf("\n\n");
-
-    rc = dongmendb_stmt_optimize(ctx->db, sqlStmt, &sqlStmtOpt);
-
-    if (rc != DONGMENDB_OK) {
-        return rc;
-    }
-
-    dongmensql_stmt_print(sqlStmtOpt);
+    if (optmiziedSelectStmt == NULL) {
+        return DONGMENDB_EINVALIDSQL;
+}
+    printf("\n\noptimized relational algebra:\n");
+    SRA_print(optmiziedSelectStmt);
     printf("\n");
 
     return DONGMENDB_OK;
@@ -627,3 +629,7 @@ int dongmendb_shell_handle_cmd_desc(dongmendb_shell_handle_sql_t *ctx, struct ha
     }
     return DONGMENDB_OK;
 };
+
+#ifdef __cplusplus
+}
+#endif
