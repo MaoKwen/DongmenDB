@@ -99,8 +99,11 @@ int file_manager_closefile(file_manager *fileManager, char *fileName){
     hashmap_remove(fileManager->openFiles, fileName, file);
 }
 
-void _iter_closefile(char * filename, void_ptr fnIterValue, void_ptr arg){
-    fclose((FILE *)fnIterValue);
+int _iter_closefile(char * filename, void_ptr fnIterValue, void_ptr arg){
+    if (!fclose((FILE *)fnIterValue)) {
+        return HMAP_S_OK;
+    }
+    return HMAP_E_FAIL;
 }
 
 int file_manager_closeallfile(file_manager *fileManager){
