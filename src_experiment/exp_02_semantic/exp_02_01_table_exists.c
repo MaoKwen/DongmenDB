@@ -20,5 +20,9 @@ int semantic_check_table_exists(table_manager *tableManager, char *tableName, tr
      * 1. 调用 table_manager_get_tableinfo 获得 table_info
      * 2. 若 table_info 为NULL则不存在，否则存在.
      * */
+    table_info *tableInfo = table_manager_get_tableinfo(tableManager, tableName, tx);
+    if (tableInfo == NULL) {
+        return DONGMENDB_ERROR_IO;
+    }
     return DONGMENDB_OK;
 }
