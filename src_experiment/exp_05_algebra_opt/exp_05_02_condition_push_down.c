@@ -17,7 +17,7 @@ Expression *findTail(Expression *begin, Expression *end) {
 }
 
 /**
- * partitionCNF 递归地遍历合取范式的左右分支，拆分条件并把 *sra 包裹成 SRA_SELECT
+ * cnfPartition 递归地遍历合取范式的左右分支，拆分条件并把 *sra 包裹成 SRA_SELECT
  * @param expr 表达式
  * @param sra 输出参数，sra 的地址
  * @return expression 的下一个节点
@@ -30,7 +30,13 @@ Expression *findTail(Expression *begin, Expression *end) {
  *       Select((b = 2),
  *          Table(F))))
  */
-Expression *partitionCNF(Expression *expr, SRA_t **sra);
+Expression *cnfPartition(Expression *expr, SRA_t **sra);
+
+/**
+ * selectPushdown 将 Select 尽可能移动到底端
+ * @param sra 输出参数，sra 的地址
+ */
+SRA_t *selectPushdown(SRA_t *sra);
 
 
 /*输入一个关系代数表达式，输出优化后的关系代数表达式
@@ -38,15 +44,18 @@ Expression *partitionCNF(Expression *expr, SRA_t **sra);
  * */
 SRA_t *dongmengdb_algebra_optimize_condition_pushdown(SRA_t *sra) {
 
-    SRA_t *ori_select = sra->project.sra;
-    SRA_t *select = ori_select->select.sra;
-    Expression *conds = ori_select->select.cond; //  [((... ... and) ... and) ... and]
+    SRA_t *ori_sra = sra->project.sra;
+    SRA_t *select = ori_sra->select.sra;
+    Expression *conds = ori_sra->select.cond; //  [((... ... and) ... and) ... and]
+
+    cnfPartition(conds, &select);
+    sra->project.sra = select;
 
     partitionCNF(conds, &select);
-    return SRAProject(select, sra->project.expr_list);
+    return sra;
 }
 
-Expression *partitionCNF(Expression *expr, SRA_t **sra) {
+Expression *cnfPartition(Expression *expr, SRA_t **sra) {
     if (!expr) return NULL;
     if (expr->term) {
         return expr->nextexpr;
@@ -55,15 +64,15 @@ Expression *partitionCNF(Expression *expr, SRA_t **sra) {
         int op_num = operators[expr->opType].numbers;
         expr = expr->nextexpr;
         while (op_num--) {
-            expr = partitionCNF(expr, sra);
+            expr = cnfPartition(expr, sra);
         }
         return expr;
     }
 
     if (expr->opType == TOKEN_AND) {
         Expression *left = expr->nextexpr;
-        Expression *right = partitionCNF(left, sra);
-        Expression *right_end = partitionCNF(right, sra);
+        Expression *right = cnfPartition(left, sra);
+        Expression *right_end = cnfPartition(right, sra);
 
         Expression *right_tail = findTail(right, right_end);
         right_tail->nextexpr = NULL;
