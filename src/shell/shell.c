@@ -243,10 +243,10 @@ int dongmendb_shell_handle_create_table(dongmendb_shell_handle_sql_t *ctx, const
 
     if (status == DONGMENDB_OK) {
         transaction_commit(ctx->db->tx);
-        fprintf(stdout, "create  success!");
+//        fprintf(stdout, "create  success!");
         return DONGMENDB_OK;
     } else {
-        fprintf(stderr, "create  failed!");
+//        fprintf(stderr, "create  failed!");
         return DONGMENDB_ERROR_IO;
     }
 };
@@ -280,10 +280,10 @@ int dongmendb_shell_handle_insert_table(dongmendb_shell_handle_sql_t *ctx, const
 
     if (status == DONGMENDB_OK) {
         transaction_commit(ctx->db->tx);
-        fprintf(stdout, "insert  success!");
+//        fprintf(stdout, "insert  success!");
         return DONGMENDB_OK;
     } else {
-        fprintf(stderr, "insert  failed!");
+//        fprintf(stderr, "insert  failed!");
         return DONGMENDB_ERROR_IO;
     }
 };
@@ -313,7 +313,7 @@ int dongmendb_shell_handle_select_table(dongmendb_shell_handle_sql_t *ctx, const
 
     /*TODO: 逻辑优化：关系代数优化*/
 
-    SRA_t *optmiziedSelectStmt = dongmengdb_algebra_optimize_condition_pushdown(selectStmt);
+    SRA_t *optmiziedSelectStmt = dongmengdb_algebra_optimize_condition_pushdown(selectStmt, ctx->db->metadataManager->tableManager);
 
     if (optmiziedSelectStmt == NULL) {
         return DONGMENDB_EINVALIDSQL;
@@ -389,7 +389,7 @@ int dongmendb_shell_handle_update_data(dongmendb_shell_handle_sql_t *ctx, const 
 
     if (count >= 0) {
         transaction_commit(ctx->db->tx);
-        fprintf(stdout, "update  success! %d line updated.", count);
+//        fprintf(stdout, "update  success! %d line updated.", count);
         return DONGMENDB_OK;
     } else {
         fprintf(stderr, "update  failed!");
@@ -522,7 +522,7 @@ int dongmendb_shell_handle_cmd_opt(dongmendb_shell_handle_sql_t *ctx, struct han
         printf(parser->parserMessage);
     }
 
-    SRA_t *optmiziedSelectStmt = dongmengdb_algebra_optimize_condition_pushdown(selectStmt);
+    SRA_t *optmiziedSelectStmt = dongmengdb_algebra_optimize_condition_pushdown(selectStmt, ctx->db->metadataManager->tableManager);
 
     if (optmiziedSelectStmt == NULL) {
         return DONGMENDB_EINVALIDSQL;
