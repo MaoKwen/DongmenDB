@@ -9,11 +9,8 @@
  *
  */
 
-Expression *findTail(Expression *begin, Expression *end) {
-    Expression *iter = begin;
-    while (iter->nextexpr != end && iter->nextexpr != NULL)
-        iter = iter->nextexpr;
-    return iter;
+bool containFields(SRA_t *sra, Expression *cond) {
+    return false;
 }
 
 /**
@@ -30,61 +27,81 @@ Expression *findTail(Expression *begin, Expression *end) {
  *       Select((b = 2),
  *          Table(F))))
  */
-Expression *cnfPartition(Expression *expr, SRA_t **sra);
+
+Expression *skipSubexpression(Expression *expr);
+Expression *findBefore(Expression *begin, Expression *end);
+void splitCNF(Expression *expr, SRA_t **sra);
 
 /**
- * selectPushdown 将 Select 尽可能移动到底端
- * @param sra 输出参数，sra 的地址
+ * 等价变换：将满足条件的 SRA_SELECT 类型的节点进行条件串接
  */
-SRA_t *selectPushdown(SRA_t *sra);
+void selectCNFOptimize(SRA_t **sra);
 
 
 /*输入一个关系代数表达式，输出优化后的关系代数表达式
  * 要求：在查询条件符合合取范式的前提下，根据等价变换规则将查询条件移动至合适的位置。
  * */
 SRA_t *dongmengdb_algebra_optimize_condition_pushdown(SRA_t *sra) {
-
-    SRA_t *ori_sra = sra->project.sra;
-    SRA_t *select = ori_sra->select.sra;
-    Expression *conds = ori_sra->select.cond; //  [((... ... and) ... and) ... and]
-
-    cnfPartition(conds, &select);
-    sra->project.sra = select;
-
-    partitionCNF(conds, &select);
+    selectCNFOptimize(&sra);
     return sra;
 }
 
-Expression *cnfPartition(Expression *expr, SRA_t **sra) {
+Expression *skipSubexpression(Expression *expr) {
     if (!expr) return NULL;
-    if (expr->term) {
+    if (expr->term)
         return expr->nextexpr;
-    }
-    if (expr->opType <= TOKEN_COMMA && expr->opType != TOKEN_AND) {
+
+    if (expr->opType <= TOKEN_COMMA) {
         int op_num = operators[expr->opType].numbers;
         expr = expr->nextexpr;
-        while (op_num--) {
-            expr = cnfPartition(expr, sra);
-        }
+        while (op_num--)
+            expr = skipSubexpression(expr);
+
         return expr;
     }
 
-    if (expr->opType == TOKEN_AND) {
-        Expression *left = expr->nextexpr;
-        Expression *right = cnfPartition(left, sra);
-        Expression *right_end = cnfPartition(right, sra);
+    return NULL;
+}
 
-        Expression *right_tail = findTail(right, right_end);
-        right_tail->nextexpr = NULL;
-        *sra = SRASelect(*sra, right);
+Expression *findBefore(Expression *begin, Expression *end) {
+    Expression *iter = begin;
+    while (iter->nextexpr != end && iter->nextexpr != NULL)
+        iter = iter->nextexpr;
+    return iter;
+}
 
-        if (left->opType == TOKEN_AND) // skip left if it already been finished
-            return right_end;
+bool isCnf(Expression *expr) {
+    if (expr->opType == TOKEN_AND) return true;
+    return false;
+}
 
-        Expression *left_tail = findTail(left, right);
-        left_tail->nextexpr = NULL;
-        *sra = SRASelect(*sra, left);
+void splitCNF(Expression *expr, SRA_t **sra) {
+    Expression *left = expr->nextexpr;
+    Expression *right = skipSubexpression(left);
 
-        return right_end;
+    Expression *left_tail = findBefore(left, right);
+    left_tail->nextexpr = NULL;
+
+    (*sra)->select.sra = SRASelect((*sra)->select.sra, left);
+    (*sra)->select.cond = right;
+}
+
+void selectCNFOptimize(SRA_t **sra) {
+    if (!*(sra)) return;
+    switch ((*sra)->t) {
+        case SRA_SELECT:
+            if (isCnf((*sra)->select.cond))
+                splitCNF((*sra)->select.cond, sra);
+            selectCNFOptimize(&((*sra)->select.sra));
+            break;
+        case SRA_PROJECT:
+            selectCNFOptimize(&((*sra)->project.sra));
+            break;
+        case SRA_JOIN:
+            selectCNFOptimize(&((*sra)->join.sra1));
+            selectCNFOptimize(&((*sra)->join.sra2));
+            break;
+        default:
+            break;
     }
 }
