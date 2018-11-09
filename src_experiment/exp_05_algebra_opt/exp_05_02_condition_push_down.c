@@ -87,19 +87,20 @@ void splitCNF(Expression *expr, SRA_t **sra) {
 }
 
 void selectCNFOptimize(SRA_t **sra) {
-    if (!*(sra)) return;
-    switch ((*sra)->t) {
+    SRA_t *s = *sra;
+    if (!s) return;
+    switch (s->t) {
         case SRA_SELECT:
-            if (isCnf((*sra)->select.cond))
-                splitCNF((*sra)->select.cond, sra);
-            selectCNFOptimize(&((*sra)->select.sra));
+            if (isCnf(s->select.cond))
+                splitCNF(s->select.cond, sra);
+            selectCNFOptimize(&(s->select.sra));
             break;
         case SRA_PROJECT:
-            selectCNFOptimize(&((*sra)->project.sra));
+            selectCNFOptimize(&(s->project.sra));
             break;
         case SRA_JOIN:
-            selectCNFOptimize(&((*sra)->join.sra1));
-            selectCNFOptimize(&((*sra)->join.sra2));
+            selectCNFOptimize(&(s->join.sra1));
+            selectCNFOptimize(&(s->join.sra2));
             break;
         default:
             break;
