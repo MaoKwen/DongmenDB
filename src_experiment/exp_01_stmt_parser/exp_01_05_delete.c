@@ -21,8 +21,8 @@ sql_stmt_delete *parse_sql_stmt_delete(ParserT *parser){
 
     TokenT *token;
 
-    // delete from
-    if (!matchToken(parser, TOKEN_RESERVED_WORD, "delete") || !matchToken(parser, TOKEN_RESERVED_WORD, "from")) {
+    // delete
+    if (!matchToken(parser, TOKEN_RESERVED_WORD, "delete")) {
         return NULL;
     }
 
