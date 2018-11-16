@@ -3,10 +3,11 @@
 //
 
 #include <test/test_stmt_parser.h>
+#include <dongmensql/optimizer.h>
 
-void TestStmtParser :: createDB(const char *dbname){
+void TestStmtParser::createDB(const char *dbname) {
 
-    test_db_ctx = (dongmendb_shell_handle_sql_t *)calloc(sizeof(dongmendb_shell_handle_sql_t),1);
+    test_db_ctx = (dongmendb_shell_handle_sql_t *) calloc(sizeof(dongmendb_shell_handle_sql_t), 1);
     dongmendb_shell_init_ctx(test_db_ctx);
 
     dongmendb *newdb = (dongmendb *) calloc(sizeof(dongmendb), 1);
@@ -21,27 +22,27 @@ void TestStmtParser :: createDB(const char *dbname){
 
 }
 
-void TestStmtParser ::createTable(){
-    int length=sizeof(_create_table_list)/sizeof(0);
+void TestStmtParser::createTable() {
+    int length = sizeof(_create_table_list) / sizeof(0);
 
-    for (int i =0 ; i< length; i++){
+    for (int i = 0; i < length; i++) {
         dongmendb_shell_handle_create_table(test_db_ctx, _create_table_list[i]);
     }
 
 };
 
 /*为db增加数据*/
-void TestStmtParser ::insertData() {
-    int length=sizeof(_insert_list)/sizeof(0);
+void TestStmtParser::insertData() {
+    int length = sizeof(_insert_list) / sizeof(0);
 
-    for (int i =0 ; i< length; i++){
+    for (int i = 0; i < length; i++) {
         dongmendb_shell_handle_insert_table(test_db_ctx, _insert_list[i]);
     }
 }
 
 
 /*删除 db 指向的数据库*/
-void TestStmtParser ::dropDB() {
+void TestStmtParser::dropDB() {
 
     dongmendb_close(test_db_ctx->db);
 
@@ -49,7 +50,7 @@ void TestStmtParser ::dropDB() {
 
 }
 
-int TestStmtParser ::select(const char *sqlselect) {
+int TestStmtParser::select(const char *sqlselect) {
 
     TokenizerT *tokenizer = TKCreate(sqlselect);
     ParserT *parser = newParser(tokenizer);
@@ -68,29 +69,29 @@ int TestStmtParser ::select(const char *sqlselect) {
 }
 
 
-int TestStmtParser ::delete_( const char *strdelete) {
+int TestStmtParser::delete_(const char *strdelete) {
 
     TokenizerT *tokenizer = TKCreate(strdelete);
     ParserT *parser = newParser(tokenizer);
     memset(parser->parserMessage, 0, sizeof(parser->parserMessage));
 
-    sql_stmt_delete *sqlStmtDelete  = parse_sql_stmt_delete(parser);
+    sql_stmt_delete *sqlStmtDelete = parse_sql_stmt_delete(parser);
 
     /*返回修改的记录条数*/
-    int count  = 0;
+    int count = 0;
     count = plan_execute_delete(test_db_ctx->db, sqlStmtDelete, test_db_ctx->db->tx);
 
     return count;
 }
 
-int TestStmtParser ::update(const char *strupdate) {
+int TestStmtParser::update(const char *strupdate) {
 
     TokenizerT *tokenizer = TKCreate(strupdate);
     ParserT *parser = newParser(tokenizer);
     memset(parser->parserMessage, 0, sizeof(parser->parserMessage));
-    sql_stmt_update *sqlStmtUpdate  = parse_sql_stmt_update(parser);
+    sql_stmt_update *sqlStmtUpdate = parse_sql_stmt_update(parser);
 
-    if(sqlStmtUpdate == NULL){
+    if (sqlStmtUpdate == NULL) {
         printf(parser->parserMessage);
         return -1;
     }
@@ -98,7 +99,7 @@ int TestStmtParser ::update(const char *strupdate) {
     sql_stmt_update_print(sqlStmtUpdate);
 
     /*返回修改的记录条数*/
-    int count  = 0;
+    int count = 0;
     count = plan_execute_update(test_db_ctx->db, sqlStmtUpdate, test_db_ctx->db->tx);
 
     return count;

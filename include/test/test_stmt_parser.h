@@ -35,6 +35,7 @@ public:
     void insertData();
     /*增加数据*/
     void dropDB();
+
     /*执行select语句*/
     int select(const char *sqlselect);
     /*执行delete语句*/
