@@ -412,7 +412,11 @@ int dongmendb_shell_handle_delete_data(dongmendb_shell_handle_sql_t *ctx, const 
         return 1;
     }
 
-    TokenizerT *tokenizer = TKCreate(sqldelete);
+    char *sql = (char *) calloc(strlen(sqldelete), 1);
+    strcpy(sql, sqldelete);
+
+    TokenizerT *tokenizer = TKCreate(sql);
+
     ParserT *parser = newParser(tokenizer);
     memset(parser->parserMessage, 0, sizeof(parser->parserMessage));
 

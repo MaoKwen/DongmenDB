@@ -15,5 +15,17 @@ int plan_execute_delete(dongmendb *db, sql_stmt_delete *sqlStmtDelete,  transact
      * 2. 执行 select 的物理计划，完成 delete 操作
      * */
 
-    return -1;
+    char *tableName = sqlStmtDelete->tableName;
+
+    physical_scan *scan = physical_scan_generate(db, sqlStmtDelete->where, tx);
+    scan->beforeFirst(scan);
+    size_t deleted_lines = 0;
+
+    while (scan->next(scan)) {
+        scan->deleterec(scan);
+        deleted_lines += 1;
+    }
+    scan->close(scan);
+
+    return deleted_lines;
 };
