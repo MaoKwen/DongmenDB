@@ -13,11 +13,20 @@
 Expression *skipSubexpression(Expression *expr);
 Expression *findBefore(Expression *begin, Expression *end);
 void splitCNF(Expression *expr, SRA_t **sra);
-
 /**
  * 等价变换：将满足条件的 SRA_SELECT 类型的节点进行条件串接
  */
 void selectCNFOptimize(SRA_t **sra);
+
+
+bool field_exists_in_table(table_manager *tm, char *tableName, char *fieldName);
+
+bool containFields(SRA_t *sra, Expression *cond, table_manager *tm);
+
+/**
+ * 等价变换：SELECT 下移
+ */
+void switchDownOptimize(SRA_t **sra, table_manager *tm);
 
 
 /*输入一个关系代数表达式，输出优化后的关系代数表达式
@@ -43,6 +52,7 @@ SRA_t *dongmengdb_algebra_optimize_condition_pushdown(SRA_t *sra, table_manager 
          * */
 
     selectCNFOptimize(&sra);
+    switchDownOptimize(&sra, tableManager);
     return sra;
 }
 
@@ -107,15 +117,45 @@ void selectCNFOptimize(SRA_t **sra) {
     }
 }
 
-bool containFields(SRA_t *join, Expression *cond) {
-    for (Expression *iter = cond; iter != NULL; iter = iter->nextexpr) {
-        if (!iter->term && iter->opType == TOKEN_WORD /* || todo */ )
+
+bool field_exists_in_table(table_manager *tm, char *tableName, char *fieldName) {
+    table_info *tableInfo = table_manager_get_tableinfo(tm, tableName, NULL);
+
+    arraylist *fieldsName = tableInfo->fieldsName;
+    for (size_t i = 0; i < fieldsName->size; ++i)
+        if (strcmp(arraylist_get(fieldsName, i), fieldName) != 0)
             return false;
-    }
+
     return true;
 }
 
-void switchDownOptimize(SRA_t **sra) {
+bool containFields(SRA_t *sra, Expression *cond, table_manager *tm) {
+    switch (sra->t) {
+        case SRA_SELECT:
+            return containFields(sra->select.sra, cond, tm);
+        case SRA_JOIN:
+            return containFields(sra->join.sra1, cond, tm) &&
+                   containFields(sra->join.sra2, cond, tm);
+        case SRA_TABLE:
+            for (Expression *iter = cond; iter != NULL; iter = iter->nextexpr) {
+                if (iter->term && iter->opType == TOKEN_WORD) {
+                    if (iter->term->t == TERM_COLREF) {
+                        if (strcmp(iter->term->ref->tableName, sra->table.ref->table_name) != 0 ||
+                            sra->table.ref->alias && strcmp(iter->term->ref->tableName, sra->table.ref->alias) != 0)
+                            return false;
+                    } else {
+                        if (!field_exists_in_table(tm, sra->table.ref->table_name, iter->term->id))
+                            return false;
+                    }
+                }
+            }
+            return true;
+        default:
+            return false;
+    }
+}
+
+void switchDownOptimize(SRA_t **sra, table_manager *tm) {
     SRA_t *s1 = *sra;
     if (!s1) return;
     switch (s1->t) {
@@ -125,18 +165,29 @@ void switchDownOptimize(SRA_t **sra) {
                 s1->select.sra = s2->select.sra;
                 s2->select.sra = s1;
                 *sra = s2;
-                switchDownOptimize(&(s1->select.sra));
+                switchDownOptimize(&(s1->select.sra), tm);
             } else if (s2->t == SRA_JOIN) {
-                // todo
+                if (containFields(s2->join.sra1, s1->select.cond, tm) &&
+                    !containFields(s2->join.sra2, s1->select.cond, tm)) {
+                    s1->select.sra = s2->join.sra1;
+                    s2->join.sra1 = s1;
+                    *sra = s2;
+                    switchDownOptimize(&(s1->join.sra1), tm);
+                } else if (containFields(s2->join.sra2, s1->select.cond, tm)) {
+                    s1->select.sra = s2->join.sra2;
+                    s2->join.sra2 = s1;
+                    *sra = s2;
+                    switchDownOptimize(&(s1->join.sra2), tm);
+                }
             }
         }
             break;
         case SRA_PROJECT:
-            switchDownOptimize(&(s1->project.sra));
+            switchDownOptimize(&(s1->project.sra), tm);
             break;
         case SRA_JOIN:
-            switchDownOptimize(&(s1->join.sra1));
-            switchDownOptimize(&(s1->join.sra2));
+            switchDownOptimize(&(s1->join.sra1), tm);
+            switchDownOptimize(&(s1->join.sra2), tm);
             break;
         default:
             break;
