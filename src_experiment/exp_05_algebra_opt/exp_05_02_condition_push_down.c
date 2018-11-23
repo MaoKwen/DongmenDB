@@ -149,9 +149,8 @@ bool containFields(SRA_t *sra, Expression *cond, table_manager *tm, transaction 
                         if (strcmp(iter->term->ref->tableName, sra->table.ref->table_name) != 0)
                             return false;
                     } else {
-                        // todo: fix
-//                        if (field_exists_in_table(tm, sra->table.ref->table_name, iter->term->ref->columnName))
-//                            return false;
+                        if (field_exists_in_table(tm, sra->table.ref->table_name, iter->term->ref->columnName, tx))
+                            return false;
                     }
                 }
             }
