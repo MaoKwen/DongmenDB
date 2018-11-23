@@ -51,8 +51,14 @@ SRA_t *dongmengdb_algebra_optimize_condition_pushdown(SRA_t *sra, table_manager 
          * 最后将SRA_Select类型的节点移动到语法树的最优位置。
          * */
 
+    printf("\norigin1:\n");
+    SRA_print(sra);
     selectCNFOptimize(&sra);
+    printf("\nstep1:\n");
+    SRA_print(sra);
     switchDownOptimize(&sra, tableManager);
+    printf("\nstep2:\n");
+    SRA_print(sra);
     return sra;
 }
 
@@ -138,14 +144,14 @@ bool containFields(SRA_t *sra, Expression *cond, table_manager *tm) {
                    containFields(sra->join.sra2, cond, tm);
         case SRA_TABLE:
             for (Expression *iter = cond; iter != NULL; iter = iter->nextexpr) {
-                if (iter->term && iter->opType == TOKEN_WORD) {
-                    if (iter->term->t == TERM_COLREF) {
-                        if (strcmp(iter->term->ref->tableName, sra->table.ref->table_name) != 0 ||
-                            sra->table.ref->alias && strcmp(iter->term->ref->tableName, sra->table.ref->alias) != 0)
+                if (iter->term && iter->term->t == TERM_COLREF) {
+                    if (iter->term->ref->tableName) {
+                        if (strcmp(iter->term->ref->tableName, sra->table.ref->table_name) != 0)
                             return false;
                     } else {
-                        if (!field_exists_in_table(tm, sra->table.ref->table_name, iter->term->id))
-                            return false;
+                        // todo: fix
+//                        if (field_exists_in_table(tm, sra->table.ref->table_name, iter->term->ref->columnName))
+//                            return false;
                     }
                 }
             }
@@ -160,25 +166,27 @@ void switchDownOptimize(SRA_t **sra, table_manager *tm) {
     if (!s1) return;
     switch (s1->t) {
         case SRA_SELECT: {
+            switchDownOptimize(&(s1->select.sra), tm);
             SRA_t *s2 = s1->select.sra;
-            if (s2->t == SRA_SELECT) {
-                s1->select.sra = s2->select.sra;
-                s2->select.sra = s1;
-                *sra = s2;
-                switchDownOptimize(&(s1->select.sra), tm);
-            } else if (s2->t == SRA_JOIN) {
-                if (containFields(s2->join.sra1, s1->select.cond, tm) &&
-                    !containFields(s2->join.sra2, s1->select.cond, tm)) {
+            if (s2->t == SRA_JOIN) {
+                bool switch_left = containFields(s2->join.sra1, s1->select.cond, tm);
+                bool switch_right = containFields(s2->join.sra2, s1->select.cond, tm);
+                if (switch_left && !switch_right) {
                     s1->select.sra = s2->join.sra1;
                     s2->join.sra1 = s1;
                     *sra = s2;
                     switchDownOptimize(&(s1->join.sra1), tm);
-                } else if (containFields(s2->join.sra2, s1->select.cond, tm)) {
+                } else if (switch_right && !switch_left) {
                     s1->select.sra = s2->join.sra2;
                     s2->join.sra2 = s1;
                     *sra = s2;
                     switchDownOptimize(&(s1->join.sra2), tm);
                 }
+            } else if (s2->t == SRA_SELECT) {
+                s1->select.sra = s2->select.sra;
+                s2->select.sra = s1;
+                *sra = s2;
+                switchDownOptimize(&(s2->select.sra), tm);
             }
         }
             break;
